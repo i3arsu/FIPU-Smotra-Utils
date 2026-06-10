@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FIPU Utils</title>
+<link rel="icon" href="assets/fipu.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-brand">
+      <img class="logo" src="assets/fipu.svg" alt="FIPU logo" />
+      <div class="titles">
+        <h1>FIPU Utils</h1>
+        <p>toolbox</p>
+      </div>
+    </div>
+
+    <nav class="side-nav" id="sideNav">
+      <!-- tool buttons injected by app.js from the tool registry -->
+    </nav>
+
+    <div class="side-foot">
+      <a href="https://www.fipu.unipu.hr" target="_blank" rel="noopener">fipu.unipu.hr</a>
+      <span>100% client-side</span>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Toggle menu">☰</button>
+      <div class="crumb">
+        <span id="toolIcon" class="crumb-ico">▦</span>
+        <span id="toolTitle">—</span>
+      </div>
+    </header>
+
+    <!-- each tool renders into here -->
+    <div class="view" id="view"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- shared helpers + tool host -->
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
+<script src="core.js"></script>
+
+<!-- ===== TOOLS: add a new <script> per tool; each self-registers ===== -->
+<script src="tools/qr.js"></script>
+<script src="tools/signature.js"></script>
+<script src="tools/sign.js"></script>
+<!-- <script src="tools/next-tool.js"></script> -->
+
+<!-- boot last -->
+<script src="app.js"></script>
+</body>
+</html>

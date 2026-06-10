@@ -214,3 +214,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# macOS
+.DS_Store
+
+# Claude Code local state
+.claude/
+
+# Generated QR artifacts (output of the old/python or web QR tools)
+QR-Code.svg
+qr_code.svg
+qr_with_*.svg
+qr_with_*.png
+QR_*.svg
+QR_*.png
+qr-*.svg
+qr-*.png
