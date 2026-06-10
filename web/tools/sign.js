@@ -61,13 +61,51 @@ FIPU.register({
         <div class="card">
           <div class="card-title">Your signature</div>
 
-          <div class="sign-pad-wrap">
-            <canvas id="sg-pad" class="sign-pad" width="600" height="200"></canvas>
-            <div class="sign-pad-hint" id="sg-padhint">draw here</div>
+          <div class="sign-tabs" id="sg-tabs">
+            <button class="sign-tab active" data-mode="draw">Draw</button>
+            <button class="sign-tab" data-mode="type">Type</button>
+            <button class="sign-tab" data-mode="upload">Upload</button>
           </div>
-          <div class="sign-pad-actions">
-            <button class="btn mini" id="sg-clearpad">Clear</button>
-            <button class="btn mini primary" id="sg-savepad">Save to library</button>
+
+          <!-- DRAW -->
+          <div class="sign-mode" data-mode="draw">
+            <div class="sign-pad-wrap">
+              <canvas id="sg-pad" class="sign-pad" width="600" height="200"></canvas>
+              <div class="sign-pad-hint" id="sg-padhint">draw here</div>
+            </div>
+            <div class="sign-pad-actions">
+              <button class="btn mini" id="sg-clearpad">Clear</button>
+              <button class="btn mini primary" id="sg-savepad">Save to library</button>
+            </div>
+          </div>
+
+          <!-- TYPE -->
+          <div class="sign-mode" data-mode="type" style="display:none">
+            <div class="field">
+              <input type="text" id="sg-typein" placeholder="Type your name…" autocomplete="off" />
+            </div>
+            <div class="sign-font-row" id="sg-fonts"></div>
+            <div class="sign-type-preview" id="sg-typeprev"><span>Your name</span></div>
+            <div class="sign-pad-actions">
+              <button class="btn mini primary" id="sg-savetype">Save to library</button>
+            </div>
+          </div>
+
+          <!-- UPLOAD -->
+          <div class="sign-mode" data-mode="upload" style="display:none">
+            <div class="drop" id="sg-updrop">
+              <input type="file" id="sg-upfile" accept="image/png,image/jpeg,image/webp" />
+              <div class="dz-ico">⤢</div>
+              <div class="dz-main">Drop an image or <b>browse</b></div>
+              <div class="dz-sub">png (transparent) · jpg · webp</div>
+            </div>
+            <div class="sign-up-preview" id="sg-upprev" style="display:none">
+              <img id="sg-upimg" alt="signature preview" />
+            </div>
+            <div class="sign-pad-actions" id="sg-upactions" style="display:none">
+              <button class="btn mini" id="sg-upclear">Clear</button>
+              <button class="btn mini primary" id="sg-upsave">Save to library</button>
+            </div>
           </div>
 
           <div class="field" style="margin-top:18px">
@@ -81,8 +119,9 @@ FIPU.register({
           </div>
 
           <button class="btn primary sign-download" id="sg-download" disabled>↓ Download signed PDF</button>
-          <p class="sg-hint">Tip: pick a saved signature (or draw one), click <em>Place
-            signature</em> or an auto-detected spot, drag to position, then download.</p>
+          <p class="sg-hint">Draw, type, or upload a signature (transparent PNGs
+            keep their transparency) and save it. Then pick it, click <em>Place
+            signature</em> or an auto-detected spot, drag to position, and download.</p>
         </div>
       </div>`;
 
@@ -95,6 +134,10 @@ FIPU.register({
     const pad = $("sg-pad"), padHint = $("sg-padhint");
     const libraryEl = $("sg-library"), sizeEl = $("sg-size"), szval = $("sg-szval");
     const downloadBtn = $("sg-download");
+    const tabsEl = $("sg-tabs");
+    const typeInEl = $("sg-typein"), fontsEl = $("sg-fonts"), typePrev = $("sg-typeprev");
+    const upDrop = $("sg-updrop"), upFile = $("sg-upfile"), upPrev = $("sg-upprev");
+    const upImg = $("sg-upimg"), upActions = $("sg-upactions");
 
     // ---- state -----------------------------------------------------------
     let pdfDoc = null;          // pdf.js doc (for rendering)
@@ -185,19 +228,137 @@ FIPU.register({
       });
     }
 
-    $("sg-savepad").addEventListener("click", () => {
-      if (!dirty) { toast("Draw a signature first"); return; }
-      const url = trimmedDataURL(pad);
-      if (!url) { toast("Nothing to save"); return; }
+    // shared: add a signature dataURL to the library and make it active
+    function commitSignature(url) {
+      if (!url) { toast("Nothing to save"); return false; }
       const list = loadLibrary(); list.unshift(url);
       if (list.length > 12) list.length = 12;
       saveLibrary(list);
       activeSig = url;
       renderLibrary();
       placeBtn.disabled = !pdfDoc;
-      clearPad();
       toast("Saved to your signature library");
+      return true;
+    }
+
+    $("sg-savepad").addEventListener("click", () => {
+      if (!dirty) { toast("Draw a signature first"); return; }
+      if (commitSignature(trimmedDataURL(pad))) clearPad();
     });
+
+    // ===================================================================
+    //  Mode B: type a name (rendered in a handwriting font)
+    // ===================================================================
+    const FONTS = [
+      { label: "Signature", css: '"Dancing Script", cursive' },
+      { label: "Script",    css: '"Great Vibes", cursive' },
+      { label: "Casual",    css: '"Caveat", cursive' },
+    ];
+    let typeFont = FONTS[0].css;
+
+    FONTS.forEach((f, i) => {
+      const b = FIPU.el("button.sign-font", { type: "button", text: f.label });
+      b.style.fontFamily = f.css;
+      if (i === 0) b.classList.add("active");
+      b.addEventListener("click", () => {
+        typeFont = f.css;
+        fontsEl.querySelectorAll(".sign-font").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        updateTypePreview();
+      });
+      fontsEl.appendChild(b);
+    });
+
+    function updateTypePreview() {
+      const txt = typeInEl.value.trim();
+      typePrev.style.fontFamily = typeFont;
+      typePrev.innerHTML = `<span>${txt ? txt.replace(/</g, "&lt;") : "Your name"}</span>`;
+      typePrev.classList.toggle("empty", !txt);
+    }
+    typeInEl.addEventListener("input", updateTypePreview);
+
+    // render the typed name onto a transparent canvas, trimmed
+    function renderTypedSignature() {
+      const txt = typeInEl.value.trim();
+      if (!txt) return null;
+      const fontPx = 120;
+      const probe = document.createElement("canvas");
+      const pc = probe.getContext("2d");
+      pc.font = `${fontPx}px ${typeFont}`;
+      const w = Math.ceil(pc.measureText(txt).width) + 60;
+      const h = Math.ceil(fontPx * 1.8);
+      probe.width = w; probe.height = h;
+      const ctx = probe.getContext("2d");
+      ctx.font = `${fontPx}px ${typeFont}`;
+      ctx.fillStyle = "#16314a";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.fillText(txt, w / 2, h / 2);
+      return trimmedDataURL(probe);
+    }
+
+    $("sg-savetype").addEventListener("click", async () => {
+      const txt = typeInEl.value.trim();
+      if (!txt) { toast("Type your name first"); return; }
+      // make sure the handwriting font is loaded before rasterising to canvas,
+      // otherwise the canvas silently falls back to a default font
+      try { await document.fonts.load(`120px ${typeFont}`, txt); } catch (_) {}
+      const url = renderTypedSignature();
+      if (commitSignature(url)) { typeInEl.value = ""; updateTypePreview(); }
+    });
+
+    // ===================================================================
+    //  Mode C: upload an image (PNG transparency preserved)
+    // ===================================================================
+    let uploadURL = null;
+    function handleUpload(file) {
+      if (!file) return;
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type) && !/\.(png|jpe?g|webp)$/i.test(file.name)) {
+        toast("Please choose a PNG, JPG or WebP image"); return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        // normalise to PNG so transparency is preserved on stamp/embed
+        const probe = new Image();
+        probe.onload = () => {
+          const cv = document.createElement("canvas");
+          cv.width = probe.naturalWidth; cv.height = probe.naturalHeight;
+          cv.getContext("2d").drawImage(probe, 0, 0);
+          uploadURL = cv.toDataURL("image/png");
+          upImg.src = uploadURL;
+          upPrev.style.display = "flex"; upActions.style.display = "grid";
+        };
+        probe.onerror = () => toast("Couldn't read that image");
+        probe.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    function clearUpload() {
+      uploadURL = null; upFile.value = "";
+      upPrev.style.display = "none"; upActions.style.display = "none"; upImg.removeAttribute("src");
+    }
+    upFile.addEventListener("change", (e) => handleUpload(e.target.files[0]));
+    upDrop.addEventListener("click", () => upFile.click());
+    ["dragenter", "dragover"].forEach((ev) => upDrop.addEventListener(ev, (e) => { e.preventDefault(); upDrop.classList.add("over"); }));
+    ["dragleave", "drop"].forEach((ev) => upDrop.addEventListener(ev, (e) => { e.preventDefault(); upDrop.classList.remove("over"); }));
+    upDrop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) handleUpload(f); });
+    $("sg-upclear").addEventListener("click", clearUpload);
+    $("sg-upsave").addEventListener("click", () => {
+      if (!uploadURL) { toast("Upload an image first"); return; }
+      if (commitSignature(uploadURL)) clearUpload();
+    });
+
+    // ---- tab switching ----------------------------------------------------
+    tabsEl.querySelectorAll(".sign-tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const mode = tab.dataset.mode;
+        tabsEl.querySelectorAll(".sign-tab").forEach((t) => t.classList.toggle("active", t === tab));
+        view.querySelectorAll(".sign-mode").forEach((m) => {
+          m.style.display = m.dataset.mode === mode ? "" : "none";
+        });
+      });
+    });
+    updateTypePreview();
 
     // ===================================================================
     //  PDF load + render

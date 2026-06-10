@@ -294,6 +294,39 @@ button.btn.mini { padding: 7px 12px; font-size: 12px; }
 .sign-suggest:hover { background: var(--fipu-deep); animation: none; }
 @keyframes sgPulse { 0%,100% { transform: translateY(-100%) scale(1); } 50% { transform: translateY(-100%) scale(1.06); } }
 
+/* signature input tabs */
+.sign-tabs { display: flex; gap: 4px; background: #eef2f6; border: 1px solid var(--line); border-radius: 9px; padding: 3px; margin-bottom: 14px; }
+.sign-tab {
+  flex: 1; border: none; background: none; cursor: pointer; font-family: var(--sans);
+  font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 7px 0; border-radius: 6px;
+  transition: background .12s, color .12s;
+}
+.sign-tab:hover { color: var(--ink); }
+.sign-tab.active { background: #fff; color: var(--fipu-deep); box-shadow: 0 1px 3px rgba(29,39,51,.08); }
+
+/* type-a-name mode */
+.sign-font-row { display: flex; gap: 8px; margin: 10px 0; }
+.sign-font {
+  flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 8px; cursor: pointer;
+  padding: 8px 4px; font-size: 18px; color: var(--ink); line-height: 1; transition: border-color .12s, background .12s;
+}
+.sign-font:hover { border-color: var(--fipu); }
+.sign-font.active { border-color: var(--fipu); background: #f0fafe; box-shadow: 0 0 0 2px rgba(43,184,230,.2); }
+.sign-type-preview {
+  display: flex; align-items: center; justify-content: center; min-height: 96px;
+  background: #fbfdfe; border: 1.5px dashed var(--line); border-radius: 10px;
+  font-size: 44px; color: #16314a; padding: 8px 14px; overflow: hidden; word-break: break-word; text-align: center;
+}
+.sign-type-preview.empty { color: var(--ink-3); }
+
+/* upload mode */
+.sign-up-preview {
+  display: flex; align-items: center; justify-content: center; min-height: 96px; margin-top: 10px;
+  background: #fbfdfe url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%23eef2f6'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23eef2f6'/%3E%3C/svg%3E");
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+}
+.sign-up-preview img { max-width: 100%; max-height: 140px; object-fit: contain; }
+
 /* signature pad */
 .sign-pad-wrap { position: relative; }
 .sign-pad {
