@@ -1,0 +1,19 @@
+# Netlify config for FIPU Utils — a static, no-build client-side site.
+# The actual site lives in web/, so that's the publish directory.
+
+[build]
+  publish = "web"
+  # no build command — these are plain static files
+
+# Long-cache the bundled vendor libraries (they're versioned/immutable).
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Make sure the pdf.js worker is served as JavaScript so it runs in a real
+# Web Worker (otherwise pdf.js falls back to the main thread).
+[[headers]]
+  for = "/vendor/pdf.worker.min.js"
+  [headers.values]
+    Content-Type = "application/javascript"
