@@ -182,6 +182,24 @@ button.btn.primary:hover:not(:disabled) { background: var(--fipu-deep); border-c
 button.btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- 4. QR tool specifics ---------- */
+/* content-type picker */
+.qr-types { display: flex; flex-wrap: wrap; gap: 8px; }
+.qr-type {
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 999px; padding: 7px 13px; font-size: 12.5px; font-weight: 500;
+  font-family: var(--sans); cursor: pointer; transition: all .14s;
+}
+.qr-type:hover { border-color: var(--fipu); color: var(--ink); }
+.qr-type.is-on {
+  background: var(--fipu); border-color: var(--fipu); color: #fff; font-weight: 600;
+  box-shadow: 0 2px 8px -2px rgba(43,184,230,.55);
+}
+.qr-check {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2);
+  cursor: pointer; margin-top: 2px;
+}
+.qr-check input { width: 16px; height: 16px; accent-color: var(--fipu); cursor: pointer; }
+
 .drop {
   border: 1.5px dashed var(--line); border-radius: 10px; background: #fbfdfe;
   padding: 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;

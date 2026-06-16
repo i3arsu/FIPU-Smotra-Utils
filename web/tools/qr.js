@@ -29,11 +29,21 @@ FIPU.register({
       </div>
       <div class="grid split">
         <div class="card">
-          <div class="card-title">Settings</div>
+          <div class="card-title">Content</div>
           <div class="field">
-            <label for="qr-data">Content / URL <span class="req">*</span></label>
-            <textarea id="qr-data" placeholder="https://example.com  ·  text  ·  anything…">https://www.fipu.unipu.hr</textarea>
+            <label>Type</label>
+            <div class="qr-types" id="qr-types">
+              <button type="button" class="qr-type is-on" data-type="url">🔗 Link / Text</button>
+              <button type="button" class="qr-type" data-type="wifi">📶 Wi-Fi</button>
+              <button type="button" class="qr-type" data-type="email">✉ Email</button>
+              <button type="button" class="qr-type" data-type="sms">💬 SMS</button>
+              <button type="button" class="qr-type" data-type="tel">📞 Phone</button>
+              <button type="button" class="qr-type" data-type="vcard">👤 Contact</button>
+            </div>
           </div>
+          <div class="qr-form" id="qr-form"><!-- per-type fields injected here --></div>
+
+          <div class="card-title" style="margin-top:24px">Style</div>
           <div class="field">
             <label>Logo</label>
             <div class="drop" id="qr-drop">
@@ -124,7 +134,8 @@ FIPU.register({
 
     // ---- element refs -----------------------------------------------------
     const $ = (id) => view.querySelector("#" + id);
-    const dataEl = $("qr-data"), fileEl = $("qr-file"), dropEl = $("qr-drop");
+    const typesEl = $("qr-types"), formEl = $("qr-form");
+    const fileEl = $("qr-file"), dropEl = $("qr-drop");
     const presetsEl = $("qr-presets"), chip = $("qr-chip"), thumb = $("qr-thumb");
     const lname = $("qr-lname"), ldim = $("qr-ldim"), lclear = $("qr-lclear");
     const lsize = $("qr-lsize"), lsval = $("qr-lsval"), eccEl = $("qr-ecc");
@@ -137,6 +148,144 @@ FIPU.register({
     // logo: {kind:'svg',inner,viewBox} | {kind:'raster',href,w,h} | null
     let logo = null;
     let lastSVG = null;
+
+    // ---- QR content types -------------------------------------------------
+    // Each type renders its own little form and assembles the QR payload
+    // string from the field values. Everything downstream reads payload().
+    const esc = (s) => (s || "").replace(/([\\;,:"])/g, "\\$1"); // for wifi/vcard
+
+    const TYPES = {
+      url: {
+        fields: `<div class="field">
+            <label>Link or text <span class="req">*</span></label>
+            <textarea data-k="text" placeholder="https://example.com  ·  any text…">https://www.fipu.unipu.hr</textarea>
+          </div>`,
+        build: (v) => v.text || "",
+      },
+      wifi: {
+        fields: `<div class="field">
+            <label>Network name (SSID) <span class="req">*</span></label>
+            <input type="text" data-k="ssid" placeholder="MyWiFi" />
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Security</label>
+              <select data-k="enc">
+                <option value="WPA" selected>WPA / WPA2</option>
+                <option value="WEP">WEP</option>
+                <option value="nopass">None (open)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input type="text" data-k="pass" placeholder="password" />
+            </div>
+          </div>
+          <label class="qr-check"><input type="checkbox" data-k="hidden" /> Hidden network</label>`,
+        build: (v) => {
+          if (!v.ssid) return "";
+          const enc = v.enc || "WPA";
+          const pass = enc === "nopass" ? "" : `P:${esc(v.pass)};`;
+          return `WIFI:T:${enc};S:${esc(v.ssid)};${pass}${v.hidden ? "H:true;" : ""};`;
+        },
+      },
+      email: {
+        fields: `<div class="field">
+            <label>To <span class="req">*</span></label>
+            <input type="text" data-k="to" placeholder="name@example.com" />
+          </div>
+          <div class="field">
+            <label>Subject</label>
+            <input type="text" data-k="subject" placeholder="Subject" />
+          </div>
+          <div class="field">
+            <label>Message</label>
+            <textarea data-k="body" placeholder="Body…"></textarea>
+          </div>`,
+        build: (v) => {
+          if (!v.to) return "";
+          const q = [];
+          if (v.subject) q.push("subject=" + encodeURIComponent(v.subject));
+          if (v.body) q.push("body=" + encodeURIComponent(v.body));
+          return `mailto:${v.to.trim()}${q.length ? "?" + q.join("&") : ""}`;
+        },
+      },
+      sms: {
+        fields: `<div class="field">
+            <label>Phone number <span class="req">*</span></label>
+            <input type="text" data-k="num" placeholder="+385 91 234 5678" />
+          </div>
+          <div class="field">
+            <label>Message</label>
+            <textarea data-k="body" placeholder="Text…"></textarea>
+          </div>`,
+        build: (v) => {
+          if (!v.num) return "";
+          const n = v.num.replace(/[^\d+]/g, "");
+          return `SMSTO:${n}:${v.body || ""}`;
+        },
+      },
+      tel: {
+        fields: `<div class="field">
+            <label>Phone number <span class="req">*</span></label>
+            <input type="text" data-k="num" placeholder="+385 91 234 5678" />
+          </div>`,
+        build: (v) => (v.num ? "tel:" + v.num.replace(/[^\d+]/g, "") : ""),
+      },
+      vcard: {
+        fields: `<div class="grid-2">
+            <div class="field"><label>First name <span class="req">*</span></label><input type="text" data-k="first" placeholder="Ada" /></div>
+            <div class="field"><label>Last name</label><input type="text" data-k="last" placeholder="Lovelace" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Phone</label><input type="text" data-k="phone" placeholder="+385 …" /></div>
+            <div class="field"><label>Email</label><input type="text" data-k="email" placeholder="name@example.com" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Organisation</label><input type="text" data-k="org" placeholder="FIPU" /></div>
+            <div class="field"><label>Job title</label><input type="text" data-k="title" placeholder="Role" /></div>
+          </div>
+          <div class="field"><label>Website</label><input type="text" data-k="url" placeholder="https://…" /></div>`,
+        build: (v) => {
+          if (!v.first && !v.last) return "";
+          const L = ["BEGIN:VCARD", "VERSION:3.0"];
+          L.push(`N:${esc(v.last)};${esc(v.first)};;;`);
+          L.push(`FN:${[v.first, v.last].filter(Boolean).join(" ")}`);
+          if (v.org) L.push(`ORG:${esc(v.org)}`);
+          if (v.title) L.push(`TITLE:${esc(v.title)}`);
+          if (v.phone) L.push(`TEL;TYPE=CELL:${v.phone}`);
+          if (v.email) L.push(`EMAIL:${v.email}`);
+          if (v.url) L.push(`URL:${v.url}`);
+          L.push("END:VCARD");
+          return L.join("\n");
+        },
+      },
+    };
+
+    let curType = "url";
+    const rerender = FIPU.debounce(() => render(), 120);
+
+    // read every [data-k] field in the form into a plain object
+    function formValues() {
+      const v = {};
+      formEl.querySelectorAll("[data-k]").forEach((el) => {
+        v[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      return v;
+    }
+    // current QR payload string for the selected type
+    function payload() {
+      return TYPES[curType].build(formValues()).trim();
+    }
+
+    function buildForm() {
+      formEl.innerHTML = TYPES[curType].fields;
+      formEl.querySelectorAll("textarea, input, select").forEach((el) => {
+        const ev = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
+        el.addEventListener(ev, ev === "change" ? render : rerender);
+      });
+      render();
+    }
 
     // ---- QR build ---------------------------------------------------------
     function buildMatrix(text, ecc) {
@@ -185,7 +334,7 @@ FIPU.register({
 
     function opts() {
       return {
-        text: dataEl.value.trim(), ecc: eccEl.value, fg: fgEl.value, bg: bgEl.value,
+        text: payload(), ecc: eccEl.value, fg: fgEl.value, bg: bgEl.value,
         margin: parseInt(marginEl.value, 10), logoRatio: parseInt(lsize.value, 10) / 100, style: styleEl.value,
       };
     }
@@ -194,7 +343,7 @@ FIPU.register({
       const o = opts();
       if (!o.text) {
         frame.style.display = "none"; empty.style.display = "block";
-        empty.innerHTML = '<span class="big">⬚</span>enter content to begin';
+        empty.innerHTML = '<span class="big">⬚</span>fill in the fields to begin';
         rover.textContent = romod.textContent = roecc.textContent = "—";
         dlpng.disabled = dlsvg.disabled = true; lastSVG = null; return;
       }
@@ -215,9 +364,11 @@ FIPU.register({
 
     // ---- downloads --------------------------------------------------------
     function fileStub() {
-      const t = dataEl.value.trim();
-      try { return ("qr-" + new URL(t).hostname.replace(/^www\./, "")).replace(/[^a-z0-9.-]/gi, "_"); }
-      catch (_) { return "qr-code"; }
+      if (curType === "url") {
+        try { return ("qr-" + new URL(payload()).hostname.replace(/^www\./, "")).replace(/[^a-z0-9.-]/gi, "_"); }
+        catch (_) { /* not a URL — fall through */ }
+      }
+      return "qr-" + curType;
     }
     function downloadSVG() {
       if (!lastSVG) return;
@@ -277,8 +428,14 @@ FIPU.register({
     });
 
     // ---- wire events ------------------------------------------------------
-    const rerender = FIPU.debounce(render, 120);
-    dataEl.addEventListener("input", rerender);
+    typesEl.querySelectorAll(".qr-type").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.type === curType) return;
+        curType = btn.dataset.type;
+        typesEl.querySelectorAll(".qr-type").forEach((b) => b.classList.toggle("is-on", b === btn));
+        buildForm();
+      });
+    });
     eccEl.addEventListener("change", render);
     styleEl.addEventListener("change", render);
     marginEl.addEventListener("input", () => { mval.textContent = marginEl.value; rerender(); });
@@ -295,6 +452,6 @@ FIPU.register({
     dlsvg.addEventListener("click", downloadSVG);
     dlpng.addEventListener("click", downloadPNG);
 
-    render();
+    buildForm(); // builds the initial (url) form and renders
   },
 });
